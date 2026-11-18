@@ -1,0 +1,81 @@
+schema_version: ir-petrinet-2
+matrix_version: representability-3
+status: initial_witnessed_hypotheses
+
+# Versioned capability catalogue.  A safe entry lowers into flat IR objects
+# supported by this shared Compiler version and is still verified by compiling
+# every concrete option.  Unsafe entries remain hard G1 stops.  The historical
+# ``local_extensions`` key is retained for compatibility with existing runs.
+local_extensions:
+  pipeline_register_chain:
+    safe: true
+    lowering: existing_schema_restructure
+    witness: capability/witnesses/memory_multicycle_gaps.md
+  bypass_derived_signal:
+    safe: true
+    lowering: existing_schema_restructure
+    witness: capability/witnesses/memory_multicycle_gaps.md
+  parameterized_combinational_iteration:
+    safe: true
+    lowering: parameterized_generate
+    witness: capability/witnesses/memory_multicycle_gaps.md
+  parameterized_multi_cycle_latency:
+    safe: true
+    lowering: parameterized_generate_restructure
+    witness: capability/witnesses/memory_multicycle_gaps.md
+  read_during_write_policy:
+    safe: false
+    lowering: shared_schema_and_backend_change_required
+    witness: capability/witnesses/memory_multicycle_gaps.md
+
+# This resource describes schema/compiler capacity.  A concrete question is
+# still checked by compiling every option against the concrete IR instance.
+categories:
+  C1:
+    priority[]: direct
+    sequential_processes[].transitions: direct
+    transitions[].guard: instance_restructure
+    clock_domains[].reset: instance_restructure
+    parameterized_priority_scan: instance_restructure
+    witness: capability/witnesses/counter_reset_vs_full.md
+  C2:
+    pipeline_register_chain: instance_restructure
+    sequential_latency_0_or_1: direct
+    parameterized_multi_cycle_latency: instance_restructure
+    witness: capability/witnesses/memory_multicycle_gaps.md
+  C3:
+    transitions[].guard: direct
+    transitions[].action: direct
+    transitions[].else_action: direct
+    derived_signals: direct
+    implicit_boundary_behavior: instance_restructure
+    witness: null
+  C4:
+    clock_domains[].reset_type: direct
+    clock_domains[].reset_polarity: direct
+    states[].reset_value: direct
+    reset_period_output_behavior: instance_restructure
+    witness: capability/witnesses/counter_reset_vs_full.md
+  C5:
+    handshake_state_and_transition: direct
+    transitions[].guard: direct
+    implicit_hold: instance_restructure
+    protocol_constraint_object: schema_extension
+    witness: null
+  C6:
+    transitions[].guard: direct
+    transitions[].action: direct
+    explicit_self_assignment: instance_restructure
+    witness: null
+  C7:
+    memory.depth_width_ports: direct
+    bypass_derived_signal: instance_restructure
+    parameterized_slice_merge: instance_restructure
+    read_during_write_policy: schema_extension
+    witness: capability/witnesses/memory_multicycle_gaps.md
+  C8:
+    states[].width: direct
+    module.parameters: direct
+    transitions[].action: direct
+    explicit_saturation_branch: instance_restructure
+    witness: null

@@ -1,0 +1,28 @@
+# Endpoints and model IDs for the version2 comparison experiments.
+# Secrets live in ONE-TURN/DAG/.env and are never written here.
+endpoints:
+  aic:
+    base_url: https://aic.tongjieda.cn/v1
+    api_key_env: DAG_API_KEY
+    models:
+      deepseek-v4.1-flash-1017: deepseek-v4.1-flash-1017
+      qwen3.8-27b: qwen3.8-27b
+  agi:
+    base_url: https://agi.tongji.edu.cn/v1
+    api_key_env: AGI_API_KEY
+    models:
+      MiMo-V2.6-Flash: MiMo-V2.6-Flash
+      GLM-5.3-Flash: GLM-5.3-Flash
+
+# Suggested experiment matrix (group 1):
+#   dataset: rtllm | rtllm_ambig | verilogeval | verilogeval_ambig
+#   system:  ours | ours_no_dag | ours_no_feedback | cppl | autochip | origen
+#   model:   deepseek-v4.1-flash-1017 (aic)
+#            qwen3.8-27b              (aic)
+#            MiMo-V2.6-Flash         (agi)
+#            GLM-5.3-Flash           (agi)
+#
+# Group 2:
+#   dataset: tempo | tempo_ambig (10 designs each)
+#   system:  ours | cppl | autochip | origen
+#   model:   deepseek-v4.1-flash-1017 (aic)

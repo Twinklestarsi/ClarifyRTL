@@ -1,0 +1,131 @@
+# IR 问题位优先的问题 DAG 实验：初始默认配置。
+# 数值是可运行的起点，不是调优结果；任何改动都要写进 run_config.json 以便复现。
+
+run:
+  case_root: /home/2531930/nas/2531930-2/ONE-TURN/version_1.0/DAG/experiment/llm_generation_errors
+  output_root: runs
+  seed: 20261108
+  arms: [A0_no_question, A1_fixed, A2_ranked_prune, A3_ranked_no_prune, A4_random]
+  max_cases: 0                               # 0 = 全部；调试时设小值
+  case_attempts: 1                           # >1 时整例重跑；与五臂定义相互独立
+  retry_attempts: 3
+  isolation:
+    solver_sees: [visible_spec, ir, graph, answers]
+    answerer_sees: [visible_spec, reference_rtl, current_question]
+    checker_sees: [visible_spec, ir, reference_rtl]
+    answerer_output: value_only              # 只回选项值 + 依据条款，不回灌 RTL 片段
+
+llm:
+  api_key_env: OPENAI_API_KEY
+  base_url_env: OPENAI_BASE_URL
+  model_env: OPENAI_MODEL
+  temperature: 0.2
+  max_tokens: 32000
+  inventory_max_tokens: 3000
+  timeout_s: 300
+  retries: 2
+  stage_retries: 3                           # 同一阶段最多再试 3 次（草案 §6.3）
+
+site_model:                                  # 块 2：问题位判定
+  taxonomy: templates/eight_categories.yaml
+  registry: capability/sites.json
+  witnesses: capability/witnesses
+  schema_version: ir-petrinet-2
+  require_local_diff: true                   # 候选 IR 的差异必须落在 site 对象内
+  require_option_compiles: true              # 每个选项都要过 checker1/2 + validate + compile
+  require_observable: true                   # 差异要在 horizon 内能从输出看到
+  observable_horizon: 16
+  allow_schema_extension: false              # S3 默认记 unaskable，不改编译器
+  allow_representation_tradeoff: true        # 允许 S2 走 R-a（域级复位降级为普通 writer）
+  record_tradeoff: true                      # 取舍必须写进 representation_choice
+
+capability:
+  matrix: capability/matrix.yaml
+
+phase_a:                                     # 块 3：问题位闭环
+  enable_pre_ir_contract: false
+  question_inventory: llm_plus_rules         # 八类清单
+  require_site_coverage: true                # 闭环判据：每条问题都可编码；G1/unsupported 会阻断冻结
+  max_rebuild_rounds: 4
+  inventory_repair_rounds: 2
+  candidate_lint: true                       # 候选补丁是否跑 Verilator lint
+  initial_ir:
+    initial_rewrite_attempts: 5              # 初始 IR 不合法时整份重写的次数
+    frontend: test_monolithic                # 原样调用 test/tempo_spec_ir_rtl 的完整单次生成器
+    test_root: /home/2531930/nas/2531930-2/ONE-TURN/version_1.0/test/tempo_spec_ir_rtl
+    timeout_s: 1200
+    repair_rounds: 3                         # checker/compile 失败后做局部 HW-IR patch，不整份重写
+    patch_attempts: 3                        # 每轮补丁最多给模型 3 次事务式候选机会
+  max_questions_per_case: 8
+  freeze_requires_compile: true              # 冻结前 IR_exp 必须能 compile_ir 一次
+  frozen_options_immutable: true             # 重建 IR 时不许偷偷改选项集合
+  allow_restructure: true
+  problem_feedback_rounds: 3                # 块 4 漏问点回到阶段 A 的最大闭环轮数
+
+phase_b:                                     # 块 4-6
+  max_questions: 8                           # 实际提问预算
+  max_options_per_question: 5
+  max_rounds: 24
+  horizon: 16
+  solver_budget_ms: 2000
+  verify_option_compiles: true
+  allow_re_freeze: false
+
+ranking:                                     # 块 5
+  method: ir_structural_proxy                # ir_structural_proxy | ir_topological | random
+  order: descending
+  weights:
+    O: 0.70   # 结构可达性（DAG/experiment/v4/ranking.py::observable_feature）
+    D: 0.00   # 行为差异（witness.bounded_impact），先关，等通路稳了再开
+    U: 0.30   # 解锁收益（unlock_feature）
+    C: 0.00   # 修改代价（revision_cost）
+  unknown_policy: record_and_fallback        # 缺特征记录并回退，不当 0
+  fallback: seeded_random
+  unlock_denominator: 8                     # U 固定按最多 8 个下游问题归一化
+  cost_operation_denominator: 40            # C 固定按 40 个 patch 操作归一化
+  require_topological: true                  # 下游不得先于上游
+
+answerer:                                    # 块 6
+  source: oracle                             # human | oracle | file
+  oracle_reads_reference: true               # 本数据集无隐藏规格文本，reference RTL 即 oracle
+  answer_source_label: oracle_reference_rtl
+  file: null
+
+phase_c:
+  repair_rounds: 4                           # 可选验证反馈扩展，不属于 A0-A4 臂定义
+  rewrite_rounds: 4                          # 可选整份重写扩展，不属于 A0-A4 臂定义
+  # Both shortcuts below inject answers instead of deriving them from the
+  # visible spec + IR, so they are opt-in and recorded when enabled.
+  truth_repair: false                        # reference truth-table repair (oracle)
+  # repair_library: /path/to/repairs         # pre-verified IR library (oracle)
+
+simulation:                                  # 保存的 testbench 仿真（非 Tempo 专用）
+  testbench_root: /home/2531930/nas/2531930-2/ONE-TURN/version_1.0/tempo26/vortex
+  testbench_name: testbench.sv
+
+rtl:                                         # 块 7
+  compiler: deterministic
+  verilator: /home/2531930/nas/2531930-2/eda_tools/conda/bin/verilator
+  emit_source_map: true
+  compile_both: true                         # IR_exp 与 IR_final 各出一份 RTL
+
+formal:                                      # 块 7
+  method: jaspergold                         # 主判定；失败时自动追加 Yosys 有界诊断
+  ssh_host: 172.31.17.1
+  ssh_user: "2531930"
+  ssh_port: 22
+  remote_root: /tmp/ir_question_dag
+  remote_setup: /tools/Cadence/cadence.env
+  jg_bin: /tools/Cadence/JASPERGOLD23/bin/jaspergold
+  jg_timeout_s: 1000
+  max_parallel: 1
+  treat_x_as_dontcare: true
+  exhaustive_max_bits: 16                   # 组合逻辑输入 ≤16 bit 时全输入穷举可作为证明
+  yosys: /home/2531930/nas/2531930-1198/eda_tools/bin/yosys
+  yosys_fallback_depth: 16                  # JG 不可用时只做有界诊断，不冒充完整等价证明
+  yosys_fallback_timeout_s: 120
+
+logging:
+  events: events.jsonl
+  keep_raw_llm: true
+  hash_artifacts: true
