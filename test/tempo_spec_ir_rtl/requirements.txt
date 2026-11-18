@@ -1,3 +1,0 @@
-# Original pipeline without the trained Contribution 1 semantic model.
-openai==2.29.0
-PyYAML==6.0

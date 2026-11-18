@@ -1,4 +1,4 @@
-# Ignore files by default, then allow source and project configuration.
+# Ignore files by default, then allow source code.
 *
 !*/
 !.gitignore
@@ -15,13 +15,6 @@
 !*.hpp
 !*.sh
 !*.tcl
-!*.yaml
-!*.yml
-!README.md
-!README_VERSION2.md
-!requirements*.txt
-!requirements*.lock.txt
-!*.lock
 
 # Local settings, credentials, caches, and experiment outputs.
 .agents/
